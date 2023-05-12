@@ -28,7 +28,7 @@ public class ApiReader implements ItemReader<Item> {
     public Item read() throws Exception {
         System.out.println("############# read" );
         if (items.isEmpty()) {
-            String encodedServiceKey = "6BK60J%2BqpPO%2BWMCbVioDCXq3W8l3dngv7VpDXR9438sdsBKYCygTVtgWQCWMaSJXabAWh%2FQzb2P6kuZt0hNddA%3D%3D";
+            String encodedServiceKey = "";
 
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode;
