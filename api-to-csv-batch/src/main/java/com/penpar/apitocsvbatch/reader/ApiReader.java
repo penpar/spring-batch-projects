@@ -30,7 +30,7 @@ public class ApiReader implements ItemReader<List<Item>> {
     public List<Item> read() throws Exception {
         if (!dataRead) {
             if (data.isEmpty()) {
-                String encodedServiceKey = "6BK60J%2BqpPO%2BWMCbVioDCXq3W8l3dngv7VpDXR9438sdsBKYCygTVtgWQCWMaSJXabAWh%2FQzb2P6kuZt0hNddA%3D%3D";
+                String encodedServiceKey = "service key";
 
                 int numOfRows = PAGE_SIZE;
                 int pageNo = 1;
