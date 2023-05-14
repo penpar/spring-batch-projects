@@ -1,12 +1,19 @@
 package com.penpar.apitocsvbatch;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.item.ExecutionContext;
+import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemWriter;
+import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.boot.SpringApplication;
@@ -15,20 +22,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.web.client.RestTemplate;
 
+import com.penpar.apitocsvbatch.model.Item;
 import com.penpar.apitocsvbatch.reader.ApiReader;
-import com.penpar.apitocsvbatch.reader.Item;
 
 @SpringBootApplication
 @EnableBatchProcessing
 public class ApiToCsvBatchApplication {
 
-    private final JobBuilderFactory jobBuilderFactory;  // Job 빌더 생성을 위한 빌더 팩토리 생성
-	private final StepBuilderFactory stepBuilderFactory; // Step 빌더 생성을 위한 빌더 팩토리 생성
+    private final JobBuilderFactory jobBuilderFactory;  
+    private final StepBuilderFactory stepBuilderFactory; 
 
-	ApiToCsvBatchApplication(JobBuilderFactory jobBuilderFactory, StepBuilderFactory stepBuilderFactory) {
-		this.jobBuilderFactory = jobBuilderFactory;
-		this.stepBuilderFactory = stepBuilderFactory;
-	}
+    ApiToCsvBatchApplication(JobBuilderFactory jobBuilderFactory, StepBuilderFactory stepBuilderFactory) {
+        this.jobBuilderFactory = jobBuilderFactory;
+        this.stepBuilderFactory = stepBuilderFactory;
+    }
     
     public static void main(String[] args) {
         SpringApplication.run(ApiToCsvBatchApplication.class, args);
@@ -51,7 +58,7 @@ public class ApiToCsvBatchApplication {
     @Bean
     public Step apiToCsvStep() {
         return stepBuilderFactory.get("apiToCsvStep")
-                .<Item, Item>chunk(1)
+                .<List<Item>, List<Item>>chunk(1)
                 .reader(apiReader())
                 .writer(csvWriter())
                 .build();
@@ -63,17 +70,38 @@ public class ApiToCsvBatchApplication {
     }
 
     @Bean
-    public FlatFileItemWriter<Item> csvWriter() {
-        FlatFileItemWriter<Item> writer = new FlatFileItemWriter<>();
-        writer.setResource(new FileSystemResource("output.csv"));
-
+    public ItemWriter<List<Item>> csvWriter() {
         BeanWrapperFieldExtractor<Item> fieldExtractor = new BeanWrapperFieldExtractor<>();
-        fieldExtractor.setNames(new String[]{"basDt", "srtnCd", "isinCd", "mrktCtg", "itmsNm", "crno", "corpNm"});
+        fieldExtractor.setNames(new String[] {
+            "basDt", "srtnCd", "isinCd", "itmsNm", "mrktCtg", "clpr", 
+            "vs", "fltRt", "mkp", "hipr", "lopr", "trqu", 
+            "trPrc", "lstgStCnt", "mrktTotAmt"
+        });
+
         DelimitedLineAggregator<Item> lineAggregator = new DelimitedLineAggregator<>();
         lineAggregator.setDelimiter(",");
         lineAggregator.setFieldExtractor(fieldExtractor);
 
-        writer.setLineAggregator(lineAggregator);
-        return writer;
+        return items -> {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+            String formattedDate = LocalDate.now().format(formatter);
+
+            FlatFileItemWriter<Item> csvWriter = new FlatFileItemWriterBuilder<Item>()
+                    .name("csvWriter")
+                    .resource(new FileSystemResource("stockinfo_" + formattedDate + ".csv")) // output file
+                    .lineAggregator(lineAggregator)
+                    .build();
+
+            try {
+                csvWriter.open(new ExecutionContext());
+                for (List<Item> itemList : items) {
+                    csvWriter.write(itemList);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                csvWriter.close();
+            }
+        };
     }
 }

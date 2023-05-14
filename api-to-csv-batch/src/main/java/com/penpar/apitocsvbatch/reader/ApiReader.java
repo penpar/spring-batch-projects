@@ -1,65 +1,80 @@
 package com.penpar.apitocsvbatch.reader;
 
+import org.springframework.batch.item.ItemReader;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.penpar.apitocsvbatch.model.Item;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.batch.item.ItemReader;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestTemplate;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-public class ApiReader implements ItemReader<Item> {
+public class ApiReader implements ItemReader<List<Item>> {
 
     private final RestTemplate restTemplate;
     private int nextPage;
-    private int totalItems;
-    private List<Item> items;
+    private List<Item> data;
+    private ObjectMapper objectMapper = new ObjectMapper();
+    private static final int PAGE_SIZE = 1000;
+    private boolean dataRead = false;
 
     public ApiReader(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
         this.nextPage = 1;
-        this.items = new ArrayList<>();
+        this.data = new ArrayList<>();
     }
 
     @Override
-    public Item read() throws Exception {
-        System.out.println("############# read" );
-        if (items.isEmpty()) {
-            String encodedServiceKey = "";
+    public List<Item> read() throws Exception {
+        if (!dataRead) {
+            if (data.isEmpty()) {
+                String encodedServiceKey = "6BK60J%2BqpPO%2BWMCbVioDCXq3W8l3dngv7VpDXR9438sdsBKYCygTVtgWQCWMaSJXabAWh%2FQzb2P6kuZt0hNddA%3D%3D";
 
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode;
-            int numOfRows = 1000;
-            int pageNo = 1;
-            int totalCount = 0;
+                int numOfRows = PAGE_SIZE;
+                int pageNo = 1;
+                int totalCount = 0;
 
-                String url = "https://apis.data.go.kr/1160100/service/GetKrxListedInfoService/getStockPriceInfo?serviceKey=" + encodedServiceKey +
-                        "&resultType=json&basDt=20230504&numOfRows=" + numOfRows + "&pageNo=" + pageNo;
+                while(true) {
+                    String url = "https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo?serviceKey="+encodedServiceKey+"&basDt=20220504&numOfRows="+1000+"&pageNo="+pageNo+"&resultType=json";
 
-                URI uri = new URI(url);
-                ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
+                    URI uri = new URI(url);
+                    ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
 
-                rootNode = objectMapper.readTree(response.getBody());
-                JsonNode responseBody = rootNode.path("response").path("body");
+                    JsonNode rootNode = objectMapper.readTree(response.getBody());
+                    JsonNode responseBody = rootNode.path("response").path("body");
 
-                totalCount = responseBody.path("totalCount").asInt();
-                System.out.println("totalCount: " + totalCount);
-                JsonNode itemsNode = responseBody.path("items").path("item");
+                    totalCount = responseBody.path("totalCount").asInt();
+                    JsonNode itemsNode = responseBody.path("items").path("item");
 
-                for (JsonNode itemNode : itemsNode) {
-                    Item item = objectMapper.treeToValue(itemNode, Item.class);
-                    items.add(item);
+                    for (JsonNode itemNode : itemsNode) {
+                        Item item = objectMapper.treeToValue(itemNode, Item.class);
+                        data.add(item);
+                    }
+
+                    if(pageNo * numOfRows >= totalCount) {
+                        System.out.println(data.size());
+                        break;
+                    }
+      
+                    pageNo++;
                 }
+            }
 
-                pageNo++;
-
+            if(!data.isEmpty()) {
+                // System.out.println(data.size());
+                // List<Item> items = data.subList(0, Math.min(PAGE_SIZE, data.size()));
+                // data = data.subList(Math.min(PAGE_SIZE, data.size()), data.size());
+                // System.out.println("data size" + data.size());
+                dataRead = true;
+                return data;
+            } else {
+                return null;
+            }
+        } else {
+            System.out.println("data is empty");
+            return null;
         }
-
-        System.out.println(items.size());
-
-        return null;
     }
 }

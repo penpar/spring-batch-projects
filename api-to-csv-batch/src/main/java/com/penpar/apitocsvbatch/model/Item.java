@@ -1,4 +1,4 @@
-package com.penpar.apitocsvbatch.reader;
+package com.penpar.apitocsvbatch.model;
 
 import lombok.Getter;
 import lombok.Setter;
