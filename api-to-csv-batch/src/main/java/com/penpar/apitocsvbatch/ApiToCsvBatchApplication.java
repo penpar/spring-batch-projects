@@ -32,12 +32,16 @@ public class ApiToCsvBatchApplication {
     private final JobBuilderFactory jobBuilderFactory;  
     private final StepBuilderFactory stepBuilderFactory; 
 
+    private static String[] appArgs;
+    private static String date;
+
     ApiToCsvBatchApplication(JobBuilderFactory jobBuilderFactory, StepBuilderFactory stepBuilderFactory) {
         this.jobBuilderFactory = jobBuilderFactory;
         this.stepBuilderFactory = stepBuilderFactory;
     }
     
     public static void main(String[] args) {
+        appArgs = args;
         SpringApplication.run(ApiToCsvBatchApplication.class, args);
     }
 
@@ -66,7 +70,10 @@ public class ApiToCsvBatchApplication {
 
     @Bean
     public ApiReader apiReader() {
-        return new ApiReader(restTemplate());
+        date = (appArgs.length > 0) ? appArgs[0] : LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+        date = "202301";
+        return new ApiReader(restTemplate(), date);
+        //return new ApiReader(restTemplate(), date);
     }
 
     @Bean
@@ -83,13 +90,13 @@ public class ApiToCsvBatchApplication {
         lineAggregator.setFieldExtractor(fieldExtractor);
 
         return items -> {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-            String formattedDate = LocalDate.now().format(formatter);
-
             FlatFileItemWriter<Item> csvWriter = new FlatFileItemWriterBuilder<Item>()
                     .name("csvWriter")
-                    .resource(new FileSystemResource("stockinfo_" + formattedDate + ".csv")) // output file
+                    .resource(new FileSystemResource("stockinfo_" + date + ".csv")) // output file
                     .lineAggregator(lineAggregator)
+                    .headerCallback(writer -> writer.write(
+                        "basDt,srtnCd,isinCd,itmsNm,mrktCtg,clpr,vs,fltRt,mkp,hipr,lopr,trqu,trPrc,lstgStCnt,mrktTotAmt"
+                    )) // header
                     .build();
 
             try {
@@ -103,5 +110,5 @@ public class ApiToCsvBatchApplication {
                 csvWriter.close();
             }
         };
-    }
+    }     
 }
